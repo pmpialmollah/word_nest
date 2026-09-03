@@ -126,10 +126,18 @@ function renderWords(){
 
   words.forEach(w => {
     const card = document.createElement('div');
-    card.className = 'word-card';
+    card.className = 'word-card' + (w.read ? ' read' : '');
 
+    // right-side actions (mark / edit / delete)
     const actions = document.createElement('div');
     actions.className = 'card-actions';
+    const markBtn = document.createElement('button');
+    markBtn.className = 'icon-btn mark-btn';
+    markBtn.title = w.read ? 'Mark as unread' : 'Mark as read';
+    markBtn.textContent = w.read ? '✓' : '○';
+    markBtn.onclick = (e) => { e.stopPropagation(); w.read = !w.read; showToast(w.read ? 'Marked as read' : 'Marked as unread'); render(); };
+    // append mark button before edit
+    actions.appendChild(markBtn);
 
     const editBtn = document.createElement('button');
     editBtn.className = 'icon-btn';
@@ -352,6 +360,26 @@ document.getElementById('saveEditBtn').onclick = () => {
   render();
 };
 
+// Enter-key navigation inside edit modal: move focus forward, save on final Enter
+document.getElementById('editWordInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('editMeaningInput').focus();
+  }
+});
+document.getElementById('editMeaningInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('editExampleInput').focus();
+  }
+});
+document.getElementById('editExampleInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter'){
+    e.preventDefault();
+    document.getElementById('saveEditBtn').click();
+  }
+});
+
 /* ---- Export ---- */
 document.getElementById('exportBtn').onclick = () => {
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
@@ -558,6 +586,26 @@ document.getElementById('confirmDeleteWordBtn').onclick = () => {
   wordPendingDelete = null;
   showToast('Word deleted');
   render();
+};
+
+/* ---- Mark all read/unread modal handlers ---- */
+document.getElementById('markAllBtn').onclick = () => {
+  document.getElementById('markAllBackdrop').classList.add('show');
+};
+document.getElementById('cancelMarkAllBtn').onclick = () => {
+  document.getElementById('markAllBackdrop').classList.remove('show');
+};
+document.getElementById('markAllBackdrop').addEventListener('click', e => {
+  if(e.target.id === 'markAllBackdrop') e.currentTarget.classList.remove('show');
+});
+document.getElementById('confirmMarkAllBtn').onclick = () => {
+  const sel = document.querySelector('input[name="mark_all_choice"]:checked');
+  if(!sel) return;
+  const choice = sel.value; // 'read' or 'unread'
+  data.words.filter(w => w.groupId === data.activeGroup).forEach(w => w.read = (choice === 'read'));
+  document.getElementById('markAllBackdrop').classList.remove('show');
+  render();
+  showToast(choice === 'read' ? 'All marked as read' : 'All marked as unread');
 };
 
 render();

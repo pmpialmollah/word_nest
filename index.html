@@ -26,6 +26,7 @@
     <div class="io-buttons">
       <button class="io-btn" id="exportBtn" title="Download data altogether"><span>export</span></button>
       <button class="io-btn" id="importBtn" title="Restore from backup"><span>import</span></button>
+      <button class="io-btn" id="markAllBtn" title="Mark all read/unread"><span>mark all</span></button>
       <input type="file" id="importFile" accept="application/json" style="display:none;">
     </div>
   </div>
@@ -98,6 +99,21 @@
     <div class="modal-actions" style="margin-top:14px;">
       <button id="cancelMergeBtn">cancel import</button>
       <button class="primary" id="confirmMergeBtn">confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="markAllBackdrop">
+  <div class="modal">
+    <h3>Mark all words</h3>
+    <p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">Choose whether to mark all words in the current group as read or unread.</p>
+    <div style="margin-bottom:12px;">
+      <label style="display:block; margin-bottom:8px;"><input type="radio" name="mark_all_choice" value="read" checked> Mark all as read</label>
+      <label style="display:block;"><input type="radio" name="mark_all_choice" value="unread"> Mark all as unread</label>
+    </div>
+    <div class="modal-actions">
+      <button id="cancelMarkAllBtn">cancel</button>
+      <button class="primary" id="confirmMarkAllBtn">confirm</button>
     </div>
   </div>
 </div>

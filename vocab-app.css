@@ -280,6 +280,23 @@
     display:flex;
     gap:2px;
   }
+
+  .mark-btn{
+    background:none;
+    border:none;
+    color:#C7C1B0;
+    font-size:13px;
+    cursor:pointer;
+    line-height:1;
+    padding:4px 6px;
+    border-radius:6px;
+  }
+  .mark-btn:hover{ color:var(--ink); background:var(--paper); }
+
+  .word-card.read{
+    background:#FFF9DF; /* light yellow */
+    border-color:#F0E2A7;
+  }
   .icon-btn{
     background:none;
     border:none;
