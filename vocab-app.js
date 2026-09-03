@@ -24,6 +24,7 @@ let searchQuery = '';
 let groupModalMode = 'create'; // 'create' | 'rename'
 let editingWordId = null;
 let groupPendingDelete = null;
+let wordPendingDelete = null;
 let openMenuGroupId = null;
 
 function saveData(){
@@ -140,10 +141,7 @@ function renderWords(){
     delBtn.className = 'icon-btn del-btn';
     delBtn.innerHTML = '&times;';
     delBtn.title = 'Delete';
-    delBtn.onclick = () => {
-      data.words = data.words.filter(x => x.id !== w.id);
-      render();
-    };
+    delBtn.onclick = () => openDeleteWordModal(w.id);
 
     actions.appendChild(editBtn);
     actions.appendChild(delBtn);
@@ -287,7 +285,7 @@ function openDeleteGroupModal(groupId){
   const g = data.groups.find(g => g.id === groupId);
   const count = data.words.filter(w => w.groupId === groupId).length;
   document.getElementById('deleteGroupMsg').textContent =
-    '"' + (g ? g.name : '') + '" It will delete group and also ' + count + 'words which could never be restored';
+    '"' + (g ? g.name : '') + '". It will delete the group and also ' + count + ' words which cannot be restored.';
   document.getElementById('deleteGroupBackdrop').classList.add('show');
 }
 document.getElementById('cancelDeleteGroupBtn').onclick = () => {
@@ -531,5 +529,35 @@ document.addEventListener('click', () => {
     renderGroups();
   }
 });
+
+/* ---- Word delete confirmation handlers (inserted at end) ---- */
+function openDeleteWordModal(wordId){
+  wordPendingDelete = wordId;
+  const w = data.words.find(x => x.id === wordId);
+  const msgEl = document.getElementById('deleteWordMsg');
+  if(msgEl) msgEl.textContent = 'Delete "' + (w ? w.text : '') + '"? This action cannot be undone.';
+  const bd = document.getElementById('deleteWordBackdrop');
+  if(bd) bd.classList.add('show');
+}
+document.getElementById('cancelDeleteWordBtn').onclick = () => {
+  const bd = document.getElementById('deleteWordBackdrop');
+  if(bd) bd.classList.remove('show');
+  wordPendingDelete = null;
+};
+document.getElementById('deleteWordBackdrop').addEventListener('click', e => {
+  if(e.target.id === 'deleteWordBackdrop'){
+    e.currentTarget.classList.remove('show');
+    wordPendingDelete = null;
+  }
+});
+document.getElementById('confirmDeleteWordBtn').onclick = () => {
+  if(!wordPendingDelete) return;
+  data.words = data.words.filter(w => w.id !== wordPendingDelete);
+  const bd = document.getElementById('deleteWordBackdrop');
+  if(bd) bd.classList.remove('show');
+  wordPendingDelete = null;
+  showToast('Word deleted');
+  render();
+};
 
 render();
