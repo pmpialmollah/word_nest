@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Nest — vocabulary builder</title>
+<link rel="icon" type="image/png" href="images/favicon.jpeg">
+<link rel="stylesheet" href="vocab-app.css">
+
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>Word Nest</h1>
+      <div class="tagline">Your Vocabulary, According To You</div>
+    </div>
+    <div class="stat-pill" id="totalCount">0 words</div>
+  </header>
+
+  <div class="groups-row" id="groupsRow"></div>
+
+  <div class="toolbar-row">
+    <input type="text" id="searchInput" class="search-input" placeholder="Search for work or meaning...">
+    <div class="io-buttons">
+      <button class="io-btn" id="exportBtn" title="Download data altogether"><span>export</span></button>
+      <button class="io-btn" id="importBtn" title="Restore from backup"><span>import</span></button>
+      <input type="file" id="importFile" accept="application/json" style="display:none;">
+    </div>
+  </div>
+
+  <div class="add-bar">
+    <input type="text" id="wordInput" class="word-input" placeholder="English word">
+    <input type="text" id="meaningInput" class="bn-input" placeholder="Bangla meaning">
+  </div>
+  <div class="add-bar">
+    <input type="text" id="exampleInput" class="example-input" placeholder="Example sentence — e.g. She gave a candid answer.">
+    <button class="add-btn" id="addWordBtn">Add word</button>
+  </div>
+
+  <div class="word-grid" id="wordGrid"></div>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h3 id="groupModalTitle">new group</h3>
+    <input type="text" id="newGroupInput" placeholder="e.g: IELTS, Daily use">
+    <div class="modal-actions">
+      <button id="cancelGroupBtn">cancel</button>
+      <button class="primary" id="saveGroupBtn">create</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="editModalBackdrop">
+  <div class="modal">
+    <h3>edit word</h3>
+    <input type="text" id="editWordInput" class="word-serif" placeholder="English word">
+    <input type="text" id="editMeaningInput" class="bn" placeholder="bangla meaning">
+    <input type="text" id="editExampleInput" placeholder="Example sentence">
+    <div class="modal-actions">
+      <button id="cancelEditBtn">cancel</button>
+      <button class="primary" id="saveEditBtn">save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="deleteGroupBackdrop">
+  <div class="modal">
+    <h3>want to delete group?</h3>
+    <p style="font-size:14px; color:var(--ink-soft); margin:0 0 16px;" id="deleteGroupMsg"></p>
+    <div class="modal-actions">
+      <button id="cancelDeleteGroupBtn">cancel</button>
+      <button class="primary" style="background:var(--danger); border-color:var(--danger);" id="confirmDeleteGroupBtn">delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="mergeModalBackdrop">
+  <div class="modal merge-modal">
+    <h3>similiar words found</h3>
+    <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">
+      The following words are already in your current list. Choose which ones to keep.
+    </p>
+    <div class="merge-list" id="mergeList"></div>
+    <div class="modal-actions" style="margin-top:14px;">
+      <button id="cancelMergeBtn">cancel import</button>
+      <button class="primary" id="confirmMergeBtn">confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="vocab-app.js"></script>
+</body>
+</html>
