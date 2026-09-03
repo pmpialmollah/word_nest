@@ -17,6 +17,12 @@
       <div class="tagline">Your Vocabulary, According To You</div>
     </div>
     <div class="stat-pill" id="totalCount">0 words</div>
+    <div id="authArea" style="display:flex; align-items:center; gap:8px;">
+      <div id="userEmail" style="font-size:13px; color:var(--ink-soft);"></div>
+      <button class="io-btn" id="loginBtn">Login</button>
+      <button class="io-btn" id="signupBtn">Sign up</button>
+      <button class="io-btn" id="logoutBtn" style="display:none;">Logout</button>
+    </div>
   </header>
 
   <div class="groups-row" id="groupsRow"></div>
@@ -103,6 +109,34 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="authModalBackdrop" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <h3 id="authModalTitle">Login</h3>
+    <input id="authEmail" placeholder="Email" type="email" aria-label="Email">
+    <div class="password-wrap">
+      <input id="authPassword" placeholder="Password" type="password" aria-label="Password">
+      <button id="toggleAuthPassword" type="button" class="password-toggle" aria-label="Show password">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 12a5 5 0 110-10 5 5 0 010 10z"/><circle cx="12" cy="12" r="2.5"/></svg>
+      </button>
+    </div>
+    <div class="modal-actions">
+      <button id="cancelAuthBtn">cancel</button>
+      <button class="primary" id="confirmAuthBtn">Login</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="logoutBackdrop">
+  <div class="modal">
+    <h3>Confirm sign out</h3>
+    <p style="font-size:13px; color:var(--ink-soft); margin:0 0 12px;">Are you sure you want to sign out?</p>
+    <div class="modal-actions">
+      <button id="cancelLogoutBtn">cancel</button>
+      <button class="primary" id="confirmLogoutBtn">sign out</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="markAllBackdrop">
   <div class="modal">
     <h3>Mark all words</h3>
@@ -120,6 +154,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="vocab-app.js"></script>
+<script type="module" src="vocab-app.js"></script>
 </body>
 </html>
