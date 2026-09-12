@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Nest - sticky notes</title>
+<link rel="icon" type="image/png" href="images/favicon.jpeg">
+<link rel="stylesheet" href="vocab-app.css">
+<script>document.documentElement.classList.add('auth-pending');</script>
+</head>
+<body class="notes-page dashboard-page">
+  <main class="notes-app">
+    <header class="notes-header">
+      <div>
+        <h1>Sticky notes</h1>
+        <p>Keep small reminders close.</p>
+        <nav class="page-nav" aria-label="Pages">
+          <a href="index.html">Words</a>
+          <a class="active" href="notes.html">Sticky notes</a>
+        </nav>
+      </div>
+      <div class="notes-header-actions">
+        <a class="settings-link" href="settings.html" title="Settings" aria-label="Settings">&#9881;</a>
+      </div>
+    </header>
+
+    <section class="note-composer" aria-label="Create a note">
+      <input id="noteTitleInput" type="text" maxlength="80" placeholder="Note title (optional)">
+      <textarea id="noteTextInput" maxlength="1000" placeholder="Write a thought, reminder, or flashcard..."></textarea>
+      <div class="composer-footer">
+        <div class="color-picker" aria-label="Choose note color">
+          <button class="color-dot yellow selected" data-color="yellow" aria-label="Yellow note"></button>
+          <button class="color-dot pink" data-color="pink" aria-label="Pink note"></button>
+          <button class="color-dot blue" data-color="blue" aria-label="Blue note"></button>
+          <button class="color-dot green" data-color="green" aria-label="Green note"></button>
+        </div>
+        <button class="add-btn" id="addNoteBtn">Add note</button>
+      </div>
+    </section>
+
+    <div class="notes-toolbar">
+      <span id="noteCount">0 notes</span>
+      <div class="note-filters" role="group" aria-label="Filter notes">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="unread">Unread</button>
+        <button class="filter-btn" data-filter="read">Read</button>
+      </div>
+    </div>
+    <section class="notes-grid" id="notesGrid" aria-live="polite"></section>
+  </main>
+
+  <div class="modal-backdrop" id="editNoteBackdrop">
+    <div class="modal note-modal">
+      <h3>Edit note</h3>
+      <input id="editNoteTitleInput" type="text" maxlength="80" placeholder="Note title (optional)">
+      <textarea id="editNoteTextInput" maxlength="1000" placeholder="Note text"></textarea>
+      <div class="color-picker modal-colors" aria-label="Choose note color">
+        <button class="color-dot yellow" data-edit-color="yellow" aria-label="Yellow note"></button>
+        <button class="color-dot pink" data-edit-color="pink" aria-label="Pink note"></button>
+        <button class="color-dot blue" data-edit-color="blue" aria-label="Blue note"></button>
+        <button class="color-dot green" data-edit-color="green" aria-label="Green note"></button>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelEditNoteBtn">cancel</button>
+        <button class="primary" id="saveEditNoteBtn">save</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="deleteNoteBackdrop">
+    <div class="modal">
+      <h3>Delete note?</h3>
+      <p id="deleteNoteMsg"></p>
+      <div class="modal-actions">
+        <button id="cancelDeleteNoteBtn">cancel</button>
+        <button class="primary danger-primary" id="confirmDeleteNoteBtn">delete</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="authModalBackdrop" aria-hidden="true">
+    <div class="modal">
+      <h3 id="authModalTitle">Login</h3>
+      <input id="authEmail" placeholder="Email" type="email">
+      <input id="authPassword" placeholder="Password" type="password">
+      <div class="modal-actions">
+        <button id="cancelAuthBtn">cancel</button>
+        <button class="primary" id="confirmAuthBtn">Login</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script type="module" src="notes.js"></script>
+</body>
+</html>

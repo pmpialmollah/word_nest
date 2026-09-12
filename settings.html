@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Nest - settings</title>
+<link rel="icon" type="image/png" href="images/favicon.jpeg">
+<link rel="stylesheet" href="vocab-app.css">
+<script>document.documentElement.classList.add('auth-pending');</script>
+</head>
+<body class="settings-page dashboard-page">
+  <main class="settings-app">
+    <header class="settings-header">
+      <div>
+        <div class="settings-page-actions">
+          <a class="settings-home-btn" href="index.html" aria-label="Go to home">&#8962; Home</a>
+        </div>
+        <h1>Settings</h1>
+        <p>Manage your Word Nest account and data.</p>
+      </div>
+    </header>
+
+    <section class="settings-section account-section">
+      <p class="settings-label">Account</p>
+      <div class="account-info">
+        <span class="account-avatar">WN</span>
+        <div><strong id="settingsEmail">Loading...</strong><span>Signed in account</span></div>
+      </div>
+      <div class="data-summary"><span><strong id="wordTotal">0</strong> words</span><span><strong id="noteTotal">0</strong> sticky notes</span></div>
+    </section>
+
+    <section class="settings-section">
+      <p class="settings-label">Your data</p>
+      <p class="settings-help">Move your complete Word Nest backup between devices. Words, groups and sticky notes are included together.</p>
+      <div class="settings-data-actions">
+        <button class="settings-action" id="exportBtn">Download all data</button>
+        <button class="settings-action" id="importBtn">Import all data</button>
+        <input type="file" id="importFile" accept="application/json" style="display:none;">
+      </div>
+    </section>
+
+    <section class="settings-section danger-section">
+      <p class="settings-label">Session</p>
+      <button class="logout-action" id="logoutBtn">Log out</button>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="logoutBackdrop">
+    <div class="modal">
+      <h3>Confirm log out</h3>
+      <p>Are you sure you want to log out of Word Nest?</p>
+      <div class="modal-actions"><button id="cancelLogoutBtn">cancel</button><button class="primary danger-primary" id="confirmLogoutBtn">log out</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script type="module" src="settings.js"></script>
+</body>
+</html>

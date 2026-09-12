@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Nest - welcome</title>
+<link rel="icon" type="image/png" href="images/favicon.jpeg">
+<link rel="stylesheet" href="vocab-app.css">
+</head>
+<body class="home-page">
+  <main class="home-card">
+    <div class="home-mark">WN</div>
+    <p class="home-kicker">A calmer way to remember</p>
+    <h1>Word Nest</h1>
+    <p class="home-copy">Build your vocabulary and keep your thoughts close, all in one private workspace.</p>
+    <div class="home-actions">
+      <button class="add-btn" id="loginBtn">Login</button>
+      <button class="home-signup-btn" id="signupBtn">Create an account</button>
+    </div>
+  </main>
+  <div class="modal-backdrop" id="authModalBackdrop" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+      <h3 id="authModalTitle">Login</h3>
+      <input id="authEmail" placeholder="Email" type="email" aria-label="Email">
+      <input id="authPassword" placeholder="Password" type="password" aria-label="Password">
+      <button class="forgot-password" id="forgotPasswordBtn" type="button">Forgot password?</button>
+      <div class="modal-actions">
+        <button id="cancelAuthBtn">cancel</button>
+        <button class="primary" id="confirmAuthBtn">Login</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+  <script type="module" src="home.js"></script>
+</body>
+</html>
