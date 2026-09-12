@@ -381,6 +381,14 @@
   .note-composer input,.note-composer textarea,.note-modal textarea{ width:100%; border:0; outline:0; background:transparent; color:var(--ink); font-family:'Inter',sans-serif; }
   .note-composer input{ font-family:'Lora',serif; font-size:19px; margin-bottom:9px; }
   .note-composer textarea,.note-modal textarea{ resize:vertical; min-height:72px; font-size:14px; line-height:1.55; }
+  .editor-toolbar{ display:flex; gap:4px; margin:2px 0 6px; }
+  .editor-toolbar button{ width:28px; height:27px; border:1px solid #D8D0BD; border-radius:6px; background:#fffaf0; color:var(--ink); cursor:pointer; font-size:14px; }
+  .editor-toolbar button.toolbar-action{ width:auto; padding:0 8px; font-size:12px; }
+  .editor-toolbar button:hover,.editor-toolbar button:focus{ border-color:var(--moss); background:#f4f0e5; outline:none; }
+  .editor-toolbar button.active{ border-color:var(--moss-dark); background:var(--moss); color:#fff; box-shadow:0 0 0 2px rgba(63,90,63,.14); }
+  .rich-editor{ min-height:72px; max-height:240px; overflow-y:auto; font-size:14px; line-height:1.55; outline:none; white-space:pre-wrap; overflow-wrap:anywhere; -webkit-touch-callout:none; }
+  .rich-editor ul,.rich-editor ol{ margin:4px 0; padding-left:24px; }
+  .rich-editor:empty::before{ content:attr(data-placeholder); color:#9A9488; pointer-events:none; }
   .composer-footer,.notes-toolbar{ display:flex; justify-content:space-between; align-items:center; gap:12px; }
   .color-picker{ display:flex; gap:8px; align-items:center; }
   .color-dot{ width:22px; height:22px; border:2px solid transparent; border-radius:50%; cursor:pointer; padding:0; }
@@ -397,14 +405,15 @@
   .sticky-note.read{ filter:saturate(.65); opacity:.72; }
   .note-pin{ position:absolute; width:10px; height:10px; border-radius:50%; background:#776A50; top:11px; left:50%; transform:translateX(-50%); box-shadow:1px 2px 2px rgba(0,0,0,.2); }
   .sticky-note h2{ font-family:'Lora',serif; font-size:18px; margin:0 0 10px; overflow-wrap:anywhere; }
-  .sticky-note p{ font-size:14px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 20px; }
+  .sticky-note .note-body{ font-size:14px; line-height:1.55; white-space:pre-wrap; overflow-wrap:anywhere; margin:0 0 20px; }
+  .sticky-note .note-body ul,.sticky-note .note-body ol{ margin:4px 0; padding-left:22px; }
   .sticky-note time{ display:block; font-size:11px; color:rgba(43,42,40,.6); }
   .note-actions{ display:flex; gap:5px; position:absolute; right:10px; bottom:9px; opacity:0; transition:opacity .15s ease; }
   .sticky-note:hover .note-actions,.sticky-note:focus-within .note-actions{ opacity:1; }
   .note-actions button{ border:0; background:rgba(255,255,255,.35); border-radius:5px; color:var(--ink); cursor:pointer; padding:5px 7px; font-size:11px; }
   .note-actions button:hover{ background:rgba(255,255,255,.7); }.note-actions .delete-note-btn:hover{ color:var(--danger); }
   .notes-empty{ grid-column:1/-1; text-align:center; padding:4rem 1rem; color:var(--ink-soft); }.notes-empty strong,.notes-empty span{ display:block; }.notes-empty strong{ font-family:'Lora',serif; font-size:20px; color:var(--ink); margin-bottom:6px; }
-  .note-modal{ width:400px; }.note-modal input{ font-family:'Lora',serif; margin-bottom:10px; }.note-modal textarea{ border:1px solid var(--card-border); border-radius:8px; padding:10px; }.modal-colors{ margin-top:14px; }.danger-primary{ background:var(--danger) !important; border-color:var(--danger) !important; color:#fff; }
+  .note-modal{ width:400px; }.note-modal input{ font-family:'Lora',serif; margin-bottom:10px; }.note-modal .rich-editor{ border:1px solid var(--card-border); border-radius:8px; padding:10px; }.modal-colors{ margin-top:14px; }.danger-primary{ background:var(--danger) !important; border-color:var(--danger) !important; color:#fff; }
   #deleteNoteMsg{ font-size:13px; color:var(--ink-soft); margin:0; }
 
   .home-page{ display:grid; place-items:center; min-height:100vh; padding:24px; background:radial-gradient(circle at top left,#FFF7D7 0,#FAF7F0 42%,#E4ECDD 100%); }

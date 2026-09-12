@@ -26,7 +26,16 @@
 
     <section class="note-composer" aria-label="Create a note">
       <input id="noteTitleInput" type="text" maxlength="80" placeholder="Note title (optional)">
-      <textarea id="noteTextInput" maxlength="1000" placeholder="Write a thought, reminder, or flashcard..."></textarea>
+      <div class="editor-toolbar" role="toolbar" aria-label="Note formatting">
+        <button type="button" data-format="bold" title="Bold"><strong>B</strong></button>
+        <button type="button" data-format="italic" title="Italic"><em>I</em></button>
+        <button type="button" data-format="underline" title="Underline"><u>U</u></button>
+        <button type="button" data-format="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">&#8226;</button>
+        <button type="button" data-format="insertOrderedList" title="Numbered list" aria-label="Numbered list">1.</button>
+        <button type="button" class="toolbar-action" data-editor-action="copy" title="Copy selected text">Copy</button>
+        <button type="button" class="toolbar-action" data-editor-action="paste" title="Paste text">Paste</button>
+      </div>
+      <div id="noteTextInput" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Write a thought, reminder, or flashcard..."></div>
       <div class="composer-footer">
         <div class="color-picker" aria-label="Choose note color">
           <button class="color-dot yellow selected" data-color="yellow" aria-label="Yellow note"></button>
@@ -53,7 +62,16 @@
     <div class="modal note-modal">
       <h3>Edit note</h3>
       <input id="editNoteTitleInput" type="text" maxlength="80" placeholder="Note title (optional)">
-      <textarea id="editNoteTextInput" maxlength="1000" placeholder="Note text"></textarea>
+      <div class="editor-toolbar" role="toolbar" aria-label="Note formatting">
+        <button type="button" data-format="bold" title="Bold"><strong>B</strong></button>
+        <button type="button" data-format="italic" title="Italic"><em>I</em></button>
+        <button type="button" data-format="underline" title="Underline"><u>U</u></button>
+        <button type="button" data-format="insertUnorderedList" title="Bulleted list" aria-label="Bulleted list">&#8226;</button>
+        <button type="button" data-format="insertOrderedList" title="Numbered list" aria-label="Numbered list">1.</button>
+        <button type="button" class="toolbar-action" data-editor-action="copy" title="Copy selected text">Copy</button>
+        <button type="button" class="toolbar-action" data-editor-action="paste" title="Paste text">Paste</button>
+      </div>
+      <div id="editNoteTextInput" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Note text"></div>
       <div class="color-picker modal-colors" aria-label="Choose note color">
         <button class="color-dot yellow" data-edit-color="yellow" aria-label="Yellow note"></button>
         <button class="color-dot pink" data-edit-color="pink" aria-label="Pink note"></button>
@@ -73,6 +91,16 @@
       <div class="modal-actions">
         <button id="cancelDeleteNoteBtn">cancel</button>
         <button class="primary danger-primary" id="confirmDeleteNoteBtn">delete</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="confirmActionBackdrop">
+    <div class="modal">
+      <h3 id="confirmActionTitle">Confirm action</h3>
+      <p id="confirmActionMsg"></p>
+      <div class="modal-actions">
+        <button id="cancelConfirmActionBtn">cancel</button>
+        <button class="primary" id="confirmActionBtn">confirm</button>
       </div>
     </div>
   </div>
