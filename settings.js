@@ -65,6 +65,9 @@ async function importData(file){
 function renderSettingsMerge(){
   const list = document.getElementById('settingsMergeList');
   list.innerHTML = '';
+  if(pendingImport.conflicts.length){
+    appendMergeSectionTitle(list, 'Words');
+  }
   pendingImport.conflicts.forEach((conflict, index) => {
     const item = document.createElement('div');
     item.className = 'merge-item';
@@ -76,6 +79,9 @@ function renderSettingsMerge(){
       '</div>';
     list.appendChild(item);
   });
+  if(pendingImport.noteConflicts.length){
+    appendMergeSectionTitle(list, 'Notes');
+  }
   pendingImport.noteConflicts.forEach((conflict, index) => {
     const item = document.createElement('div');
     item.className = 'merge-item';
@@ -87,6 +93,12 @@ function renderSettingsMerge(){
       '</div>';
     list.appendChild(item);
   });
+}
+function appendMergeSectionTitle(container, title){
+  const heading = document.createElement('h4');
+  heading.className = 'merge-section-title';
+  heading.textContent = title;
+  container.appendChild(heading);
 }
 function escapeHtml(value){
   const element = document.createElement('div');

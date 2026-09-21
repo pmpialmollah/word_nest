@@ -523,6 +523,7 @@
   }
 
   .merge-modal{ width:420px; max-width:92vw; max-height:80vh; display:flex; flex-direction:column; }
+  .merge-section-title{ margin:4px 0 8px; padding-bottom:6px; border-bottom:1px solid var(--card-border); color:var(--moss-dark); font-size:13px; font-weight:600; letter-spacing:.03em; text-transform:uppercase; }
   .merge-list{
     overflow-y:auto;
     display:flex;
