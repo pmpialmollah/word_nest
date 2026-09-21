@@ -116,3 +116,15 @@ export async function importRecords(uid, { groups = [], words = [], notes = [], 
   for (const note of notes) await addNote(uid, note);
   if (activeGroup) await setActiveGroup(uid, activeGroup);
 }
+
+export async function importNotes(uid, plan, choices) {
+  for (const note of plan.notesToAdd) await addNote(uid, note);
+  for (const [index, conflict] of plan.conflicts.entries()) {
+    const choice = choices[index] || 'keep_existing';
+    if (choice === 'keep_new') {
+      await addNote(uid, { ...conflict.imported, id: conflict.existing.id });
+    } else if (choice === 'keep_both') {
+      await addNote(uid, { ...conflict.imported, id: 'n_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8) });
+    }
+  }
+}

@@ -1,7 +1,8 @@
-import { addWord, getAccountData, importRecords } from './src/repositories/vocabularyRepository.js';
+import { addWord, getAccountData, importNotes, importRecords } from './src/repositories/vocabularyRepository.js';
 import { initFirebase } from './src/firebase/config.js';
 import { onAuthStateChanged, signOutUser } from './src/firebase/auth.js';
 import { showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
+import { createNoteImportPlan } from './src/features/notes/mergePlan.js';
 
 let currentUser = null;
 let backupData = {groups:[], activeGroup:'', words:[], notes:[]};
@@ -53,8 +54,9 @@ async function importData(file){
       if(match) conflicts.push({imported:word, existing:match, groupId});
       else wordsToAdd.push({id:crypto.randomUUID ? crypto.randomUUID() : 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), text:word.text || '', meaning:word.meaning || '', example:word.example || '', groupId, revealed:false, read:Boolean(word.read)});
     });
-    pendingImport = {groupsToAdd, wordsToAdd, conflicts, notes:toArray(imported.notes)};
-    if(conflicts.length) {
+    const notePlan = createNoteImportPlan(toArray(imported.notes), toArray(existing.notes));
+    pendingImport = {groupsToAdd, wordsToAdd, conflicts, notes:notePlan.notesToAdd, noteConflicts:notePlan.conflicts};
+    if(conflicts.length || notePlan.conflicts.length) {
       renderSettingsMerge();
       document.getElementById('settingsMergeBackdrop').classList.add('show');
     } else applySettingsImport([]);
@@ -74,6 +76,17 @@ function renderSettingsMerge(){
       '</div>';
     list.appendChild(item);
   });
+  pendingImport.noteConflicts.forEach((conflict, index) => {
+    const item = document.createElement('div');
+    item.className = 'merge-item';
+    item.innerHTML = '<p class="mi-word">' + escapeHtml(conflict.imported.title || 'Untitled note') + '</p>' +
+      '<div class="merge-options">' +
+      '<label><input type="radio" name="settings_note_merge_' + index + '" value="keep_existing" checked> keep existing</label>' +
+      '<label><input type="radio" name="settings_note_merge_' + index + '" value="keep_new"> replace with imported</label>' +
+      '<label><input type="radio" name="settings_note_merge_' + index + '" value="keep_both"> keep both</label>' +
+      '</div>';
+    list.appendChild(item);
+  });
 }
 function escapeHtml(value){
   const element = document.createElement('div');
@@ -82,7 +95,7 @@ function escapeHtml(value){
 }
 async function applySettingsImport(choices){
   if(!pendingImport || !currentUser) return;
-  const {groupsToAdd, wordsToAdd, conflicts, notes} = pendingImport;
+  const {groupsToAdd, wordsToAdd, conflicts, notes, noteConflicts} = pendingImport;
   try{
     const notesToAdd = notes.map(note => {
       const id = crypto.randomUUID ? crypto.randomUUID() : 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -97,6 +110,8 @@ async function applySettingsImport(choices){
         await addWord(currentUser.uid, Object.assign({}, conflict.imported, {id, groupId:conflict.groupId}));
       }
     }
+    const noteChoices = noteConflicts.map((_, index) => document.querySelector('input[name="settings_note_merge_' + index + '"]:checked')?.value || 'keep_existing');
+    await importNotes(currentUser.uid, { notesToAdd:[], conflicts:noteConflicts }, noteChoices);
     pendingImport = null;
     document.getElementById('settingsMergeBackdrop').classList.remove('show');
     showToast('All data imported without removing existing data');

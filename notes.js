@@ -1,13 +1,15 @@
 import {
   subscribeToNotes,
   addNote as addNoteToRepository,
-  importRecords,
+  getAccountData,
+  importNotes,
   updateNote,
   deleteNote as deleteNoteFromRepository
 } from './src/repositories/vocabularyRepository.js';
 import { initFirebase } from './src/firebase/config.js';
 import { onAuthStateChanged, signUpWithEmail, signInWithEmail, signOutUser } from './src/firebase/auth.js';
 import { finishDataLoading, showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
+import { createNoteImportPlan } from './src/features/notes/mergePlan.js';
 
 const STORAGE_KEY = 'wordnest_data_v1';
 const NOTE_COLORS = ['yellow', 'pink', 'blue', 'green'];
@@ -22,6 +24,7 @@ let deletingNoteId = null;
 let savedEditor = null;
 let savedEditorRange = null;
 let pendingConfirmation = null;
+let pendingNoteImport = null;
 let data = loadData();
 
 initFirebase();
@@ -321,17 +324,46 @@ if(importFile) importFile.onchange = event => {
     try{
       const imported = JSON.parse(loadEvent.target.result);
       if(!imported.groups || !imported.words){ showToast('The file is not in correct format'); return; }
-      await importRecords(currentUser.uid, {
-        groups: imported.groups,
-        words: imported.words,
-        notes: imported.notes || [],
-        activeGroup: imported.activeGroup
-      });
-      showToast('All data imported to cloud');
+      const account = await getAccountData(currentUser.uid) || {};
+      pendingNoteImport = createNoteImportPlan(imported.notes || [], normalizeNotes(account));
+      if(pendingNoteImport.conflicts.length) {
+        renderNoteMergeModal();
+        document.getElementById('notesMergeBackdrop').classList.add('show');
+      } else applyNoteImport([]);
     }catch(error){ console.error(error); showToast('Import failed'); }
     event.target.value = '';
   };
   reader.readAsText(file);
+};
+function renderNoteMergeModal(){
+  const list = document.getElementById('notesMergeList');
+  list.innerHTML = '';
+  pendingNoteImport.conflicts.forEach((conflict, index) => {
+    const item = document.createElement('div');
+    item.className = 'merge-item';
+    item.innerHTML = '<p class="mi-word">' + escapeHtml(conflict.imported.title || 'Untitled note') + '</p>' +
+      '<div class="merge-options">' +
+      '<label><input type="radio" name="notes_merge_' + index + '" value="keep_existing" checked> keep existing</label>' +
+      '<label><input type="radio" name="notes_merge_' + index + '" value="keep_new"> replace with imported</label>' +
+      '<label><input type="radio" name="notes_merge_' + index + '" value="keep_both"> keep both</label>' +
+      '</div>';
+    list.appendChild(item);
+  });
+}
+async function applyNoteImport(choices){
+  if(!pendingNoteImport || !currentUser) return;
+  try{
+    await importNotes(currentUser.uid, pendingNoteImport, choices);
+    pendingNoteImport = null;
+    document.getElementById('notesMergeBackdrop').classList.remove('show');
+    showToast('Notes imported without removing existing notes');
+  }catch(error){ console.error(error); showToast('Import failed'); }
+}
+document.getElementById('cancelNotesMergeBtn').onclick = () => { pendingNoteImport = null; document.getElementById('notesMergeBackdrop').classList.remove('show'); };
+document.getElementById('confirmNotesMergeBtn').onclick = () => {
+  if(!pendingNoteImport) return;
+  const choices = pendingNoteImport.conflicts.map((_, index) => document.querySelector('input[name="notes_merge_' + index + '"]:checked')?.value || 'keep_existing');
+  applyNoteImport(choices);
 };
 
 function showAuthModal(mode){ document.getElementById('authModalBackdrop').classList.add('show'); document.getElementById('authModalBackdrop').dataset.mode = mode; document.getElementById('authModalTitle').textContent = mode === 'signup' ? 'Sign up' : 'Login'; document.getElementById('confirmAuthBtn').textContent = mode === 'signup' ? 'Sign up' : 'Login'; document.getElementById('authEmail').focus(); }
