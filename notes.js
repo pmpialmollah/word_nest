@@ -1,21 +1,19 @@
 import {
-  initFirebase,
-  onAuthStateChanged,
-  signUpWithEmail,
-  signInWithEmail,
-  signOutUser,
-  getUserOnce,
-  listenToUser,
-  stopListeningToUser,
-  setUserChild,
-  updateUserChild,
-  removeUserChild
-} from './firebase-config.js';
+  subscribeToNotes,
+  addNote as addNoteToRepository,
+  importRecords,
+  updateNote,
+  deleteNote as deleteNoteFromRepository
+} from './src/repositories/vocabularyRepository.js';
+import { initFirebase } from './src/firebase/config.js';
+import { onAuthStateChanged, signUpWithEmail, signInWithEmail, signOutUser } from './src/firebase/auth.js';
+import { finishDataLoading, showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
 
 const STORAGE_KEY = 'wordnest_data_v1';
 const NOTE_COLORS = ['yellow', 'pink', 'blue', 'green'];
 let currentUser = null;
 let currentListenerUid = null;
+let stopNotesSubscription = null;
 let activeFilter = 'all';
 let selectedColor = 'yellow';
 let editColor = 'yellow';
@@ -81,26 +79,18 @@ function normalizeNotes(snapshot){
 }
 async function startUserSync(uid){
   if(currentListenerUid === uid) return;
-  if(currentListenerUid) stopListeningToUser(currentListenerUid);
+  if(stopNotesSubscription) stopNotesSubscription();
   currentListenerUid = uid;
-  const cloud = await getUserOnce(uid);
-  const localNotes = data.notes || [];
-  if(!cloud){
-    if(localNotes.length) await setUserChild(uid, 'notes', Object.fromEntries(localNotes.map(note => [note.id, note])));
-  }else{
-    const cloudNotes = cloud.notes || {};
-    const missing = {};
-    localNotes.forEach(note => { if(!cloudNotes[note.id]) missing[note.id] = note; });
-    if(Object.keys(missing).length) await setUserChild(uid, 'notes', Object.assign({}, cloudNotes, missing));
-  }
-  listenToUser(uid, snapshot => {
+  stopNotesSubscription = subscribeToNotes(uid, snapshot => {
     data.notes = normalizeNotes(snapshot);
     saveData();
     renderNotes();
+    finishDataLoading();
   });
 }
 function stopUserSync(){
-  if(currentListenerUid) stopListeningToUser(currentListenerUid);
+  if(stopNotesSubscription) stopNotesSubscription();
+  stopNotesSubscription = null;
   currentListenerUid = null;
 }
 function persistLocal(){ saveData(); renderNotes(); }
@@ -167,14 +157,14 @@ function addNote(){
   editor.innerHTML = '';
 }
 function writeNote(note, message){
-  if(currentUser){ setUserChild(currentUser.uid, 'notes/' + note.id, note).then(() => showToast(message)).catch(error => {console.error(error); showToast('Save failed');}); }
+  if(currentUser){ addNoteToRepository(currentUser.uid, note).then(() => showToast(message)).catch(error => {console.error(error); showToast('Save failed');}); }
   else { data.notes = [note, ...(data.notes || [])]; persistLocal(); showToast(message); }
 }
 function toggleRead(note){
   if(!requireAuth()) return;
   openConfirmation(note.read ? 'Mark this note as unread?' : 'Mark this note as read?', () => {
     const update = {read:!note.read, updatedAt:Date.now()};
-    if(currentUser) updateUserChild(currentUser.uid, 'notes/' + note.id, update).catch(error => {console.error(error); showToast('Update failed');});
+    if(currentUser) updateNote(currentUser.uid, note.id, update).catch(error => {console.error(error); showToast('Update failed');});
     else { Object.assign(note, update); persistLocal(); }
   });
 }
@@ -197,7 +187,7 @@ function saveEditNote(){
   if(!note) return;
   const update = {title:document.getElementById('editNoteTitleInput').value.trim(), text, richText:editorHtml(editor), color:editColor, updatedAt:Date.now()};
   openConfirmation('Save these changes to the note?', () => {
-    if(currentUser) updateUserChild(currentUser.uid, 'notes/' + note.id, update).then(() => showToast('Note updated')).catch(error => {console.error(error); showToast('Update failed');});
+    if(currentUser) updateNote(currentUser.uid, note.id, update).then(() => showToast('Note updated')).catch(error => {console.error(error); showToast('Update failed');});
     else { Object.assign(note, update); persistLocal(); showToast('Note updated'); }
     closeEditNote();
   });
@@ -207,7 +197,7 @@ function closeDeleteNote(){ document.getElementById('deleteNoteBackdrop').classL
 function deleteNote(){
   if(!requireAuth()) return;
   const id = deletingNoteId; if(!id) return;
-  if(currentUser) removeUserChild(currentUser.uid, 'notes/' + id).then(() => {closeDeleteNote(); showToast('Note deleted');}).catch(error => {console.error(error); showToast('Delete failed');});
+  if(currentUser) deleteNoteFromRepository(currentUser.uid, id).then(() => {closeDeleteNote(); showToast('Note deleted');}).catch(error => {console.error(error); showToast('Delete failed');});
   else { data.notes = data.notes.filter(note => note.id !== id); closeDeleteNote(); persistLocal(); showToast('Note deleted'); }
 }
 
@@ -331,10 +321,12 @@ if(importFile) importFile.onchange = event => {
     try{
       const imported = JSON.parse(loadEvent.target.result);
       if(!imported.groups || !imported.words){ showToast('The file is not in correct format'); return; }
-      for(const group of imported.groups) await setUserChild(currentUser.uid, 'groups/' + group.id, group);
-      for(const word of imported.words) await setUserChild(currentUser.uid, 'words/' + word.id, word);
-      for(const note of (imported.notes || [])) await setUserChild(currentUser.uid, 'notes/' + note.id, note);
-      if(imported.activeGroup) await setUserChild(currentUser.uid, 'activeGroup', imported.activeGroup);
+      await importRecords(currentUser.uid, {
+        groups: imported.groups,
+        words: imported.words,
+        notes: imported.notes || [],
+        activeGroup: imported.activeGroup
+      });
       showToast('All data imported to cloud');
     }catch(error){ console.error(error); showToast('Import failed'); }
     event.target.value = '';
@@ -350,9 +342,14 @@ document.getElementById('confirmAuthBtn').onclick = async () => { const email = 
 onAuthStateChanged(async user => {
   currentUser = user;
   if(user){
-    await startUserSync(user.uid);
-    document.documentElement.classList.remove('auth-pending');
+    showAuthenticatedShell(user);
+    startUserSync(user.uid).catch(error => {
+      console.error(error);
+      finishDataLoading();
+      showToast('Could not load your notes');
+    });
   }else{
+    showUnauthorized();
     window.location.replace('home.html');
     return;
   }

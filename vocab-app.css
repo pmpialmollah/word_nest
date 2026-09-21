@@ -248,6 +248,18 @@
     grid-template-columns:repeat(auto-fill, minmax(230px, 1fr));
     gap:14px;
   }
+  html.data-loading .word-grid:empty::before{
+    content:'Loading your words...';
+    display:block;
+    min-height:112px;
+    padding:18px;
+    border:1px solid var(--card-border);
+    border-radius:var(--radius);
+    color:var(--ink-soft);
+    background:linear-gradient(90deg, var(--card), #F2EEE5, var(--card));
+    background-size:220% 100%;
+    animation:loading-sheen 1.4s ease-in-out infinite;
+  }
   .word-card{
     background:var(--card);
     border:1px solid var(--card-border);
@@ -399,6 +411,19 @@
   .filter-btn{ border:0; background:transparent; color:var(--ink-soft); cursor:pointer; padding:6px 10px; border-radius:7px; font-size:13px; }
   .filter-btn.active{ background:var(--ink); color:#fff; }
   .notes-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:24px 18px; align-items:start; }
+  html.data-loading .notes-grid:empty::before{
+    content:'Loading your notes...';
+    display:block;
+    min-height:112px;
+    padding:18px;
+    border:1px solid var(--card-border);
+    border-radius:var(--radius);
+    color:var(--ink-soft);
+    background:linear-gradient(90deg, var(--card), #F2EEE5, var(--card));
+    background-size:220% 100%;
+    animation:loading-sheen 1.4s ease-in-out infinite;
+  }
+  @keyframes loading-sheen{ 0%{background-position:100% 0;} 100%{background-position:-100% 0;} }
   .sticky-note{ min-height:205px; padding:28px 20px 18px; position:relative; background:#F7D96B; box-shadow:3px 6px 12px rgba(65,53,29,.16); transform:rotate(var(--note-tilt)); transition:transform .18s ease, box-shadow .18s ease; }
   .sticky-note:hover{ transform:rotate(0) translateY(-3px); box-shadow:4px 10px 18px rgba(65,53,29,.2); }
   .sticky-note.pink{ background:#F2A7A4; }.sticky-note.blue{ background:#9EC8DF; }.sticky-note.green{ background:#A9C99C; }

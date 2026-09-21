@@ -6,7 +6,7 @@
 <title>Word Nest — vocabulary builder</title>
 <link rel="icon" type="image/png" href="images/favicon.jpeg">
 <link rel="stylesheet" href="vocab-app.css">
-<script>document.documentElement.classList.add('auth-pending');</script>
+<script>document.documentElement.classList.add('auth-pending', 'data-loading');</script>
 
 </head>
 <body class="dashboard-page">
@@ -68,6 +68,17 @@
     <div class="modal-actions">
       <button id="cancelEditBtn">cancel</button>
       <button class="primary" id="saveEditBtn">save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="editConfirmBackdrop">
+  <div class="modal">
+    <h3>Save word changes?</h3>
+    <p id="editConfirmMsg" style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">Save these changes to this word?</p>
+    <div class="modal-actions">
+      <button id="cancelEditConfirmBtn">cancel</button>
+      <button class="primary" id="confirmEditBtn">save changes</button>
     </div>
   </div>
 </div>
@@ -153,6 +164,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module" src="vocab-app.js"></script>
+<script type="module" src="/src/main.js"></script>
 </body>
 </html>

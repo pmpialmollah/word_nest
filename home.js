@@ -1,4 +1,5 @@
-import { initFirebase, onAuthStateChanged, signUpWithEmail, signInWithEmail, resetPassword } from './firebase-config.js';
+import { initFirebase } from './src/firebase/config.js';
+import { onAuthStateChanged, signUpWithEmail, signInWithEmail, resetPassword } from './src/firebase/auth.js';
 
 initFirebase();
 const backdrop = document.getElementById('authModalBackdrop');

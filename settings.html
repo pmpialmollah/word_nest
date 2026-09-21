@@ -6,7 +6,7 @@
 <title>Word Nest - settings</title>
 <link rel="icon" type="image/png" href="images/favicon.jpeg">
 <link rel="stylesheet" href="vocab-app.css">
-<script>document.documentElement.classList.add('auth-pending');</script>
+<script>document.documentElement.classList.add('auth-pending', 'data-loading');</script>
 </head>
 <body class="settings-page dashboard-page">
   <main class="settings-app">
@@ -52,7 +52,18 @@
       <div class="modal-actions"><button id="cancelLogoutBtn">cancel</button><button class="primary danger-primary" id="confirmLogoutBtn">log out</button></div>
     </div>
   </div>
+  <div class="modal-backdrop" id="settingsMergeBackdrop">
+    <div class="modal merge-modal">
+      <h3>Similar data found</h3>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">Choose what to do with words that already exist in your account.</p>
+      <div class="merge-list" id="settingsMergeList"></div>
+      <div class="modal-actions" style="margin-top:14px;">
+        <button id="cancelSettingsMergeBtn">cancel import</button>
+        <button class="primary" id="confirmSettingsMergeBtn">confirm</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
-  <script type="module" src="settings.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

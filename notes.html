@@ -6,7 +6,7 @@
 <title>Word Nest - sticky notes</title>
 <link rel="icon" type="image/png" href="images/favicon.jpeg">
 <link rel="stylesheet" href="vocab-app.css">
-<script>document.documentElement.classList.add('auth-pending');</script>
+<script>document.documentElement.classList.add('auth-pending', 'data-loading');</script>
 </head>
 <body class="notes-page dashboard-page">
   <main class="notes-app">
@@ -116,6 +116,6 @@
     </div>
   </div>
   <div class="toast" id="toast"></div>
-  <script type="module" src="notes.js"></script>
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -1,8 +1,11 @@
-import { initFirebase, onAuthStateChanged, listenToUser, stopListeningToUser, signOutUser, setUserChild } from './firebase-config.js';
+import { addWord, getAccountData, importRecords } from './src/repositories/vocabularyRepository.js';
+import { initFirebase } from './src/firebase/config.js';
+import { onAuthStateChanged, signOutUser } from './src/firebase/auth.js';
+import { showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
 
 let currentUser = null;
-let listenerUid = null;
 let backupData = {groups:[], activeGroup:'', words:[], notes:[]};
+let pendingImport = null;
 initFirebase();
 
 function toArray(value){
@@ -27,12 +30,76 @@ async function importData(file){
   try{
     const imported = JSON.parse(await file.text());
     if(!imported.groups || !imported.words || !currentUser){ showToast('The file is not in correct format'); return; }
-    if(!window.confirm('Import all words, groups, and sticky notes into this account?')) return;
-    for(const group of toArray(imported.groups)) await setUserChild(currentUser.uid, 'groups/' + group.id, group);
-    for(const word of toArray(imported.words)) await setUserChild(currentUser.uid, 'words/' + word.id, word);
-    for(const note of toArray(imported.notes)) await setUserChild(currentUser.uid, 'notes/' + note.id, note);
-    if(imported.activeGroup) await setUserChild(currentUser.uid, 'activeGroup', imported.activeGroup);
-    showToast('All data imported');
+    const existing = await getAccountData(currentUser.uid) || {};
+    const existingGroups = toArray(existing.groups);
+    const existingWords = toArray(existing.words);
+    const groupIdMap = {};
+    const groupsToAdd = [];
+    toArray(imported.groups).forEach(group => {
+      const match = existingGroups.find(item => (item.name || '').trim().toLowerCase() === (group.name || '').trim().toLowerCase());
+      if(match) groupIdMap[group.id] = match.id;
+      else {
+        const id = crypto.randomUUID ? crypto.randomUUID() : 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        groupIdMap[group.id] = id;
+        groupsToAdd.push({id, name:group.name || 'Imported group'});
+      }
+    });
+    const wordsToAdd = [];
+    const conflicts = [];
+    toArray(imported.words).forEach(word => {
+      const groupId = groupIdMap[word.groupId];
+      if(!groupId) return;
+      const match = existingWords.find(item => item.groupId === groupId && (item.text || '').trim().toLowerCase() === (word.text || '').trim().toLowerCase());
+      if(match) conflicts.push({imported:word, existing:match, groupId});
+      else wordsToAdd.push({id:crypto.randomUUID ? crypto.randomUUID() : 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), text:word.text || '', meaning:word.meaning || '', example:word.example || '', groupId, revealed:false, read:Boolean(word.read)});
+    });
+    pendingImport = {groupsToAdd, wordsToAdd, conflicts, notes:toArray(imported.notes)};
+    if(conflicts.length) {
+      renderSettingsMerge();
+      document.getElementById('settingsMergeBackdrop').classList.add('show');
+    } else applySettingsImport([]);
+  }catch(error){ console.error(error); showToast('Import failed'); }
+}
+function renderSettingsMerge(){
+  const list = document.getElementById('settingsMergeList');
+  list.innerHTML = '';
+  pendingImport.conflicts.forEach((conflict, index) => {
+    const item = document.createElement('div');
+    item.className = 'merge-item';
+    item.innerHTML = '<p class="mi-word">' + escapeHtml(conflict.imported.text) + '</p>' +
+      '<div class="merge-options">' +
+      '<label><input type="radio" name="settings_merge_' + index + '" value="keep_existing" checked> keep existing <span class="mi-meaning">' + escapeHtml(conflict.existing.meaning || 'no meaning') + '</span></label>' +
+      '<label><input type="radio" name="settings_merge_' + index + '" value="keep_new"> replace with imported <span class="mi-meaning">' + escapeHtml(conflict.imported.meaning || 'no meaning') + '</span></label>' +
+      '<label><input type="radio" name="settings_merge_' + index + '" value="keep_both"> keep both</label>' +
+      '</div>';
+    list.appendChild(item);
+  });
+}
+function escapeHtml(value){
+  const element = document.createElement('div');
+  element.textContent = value == null ? '' : value;
+  return element.innerHTML;
+}
+async function applySettingsImport(choices){
+  if(!pendingImport || !currentUser) return;
+  const {groupsToAdd, wordsToAdd, conflicts, notes} = pendingImport;
+  try{
+    const notesToAdd = notes.map(note => {
+      const id = crypto.randomUUID ? crypto.randomUUID() : 'n_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+      return Object.assign({}, note, {id});
+    });
+    await importRecords(currentUser.uid, { groups:groupsToAdd, words:wordsToAdd, notes:notesToAdd });
+    for(const [index, conflict] of conflicts.entries()) {
+      const choice = choices[index] || 'keep_existing';
+      if(choice === 'keep_new') await addWord(currentUser.uid, Object.assign({}, conflict.imported, {id:conflict.existing.id, groupId:conflict.groupId}));
+      if(choice === 'keep_both') {
+        const id = crypto.randomUUID ? crypto.randomUUID() : 'w_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        await addWord(currentUser.uid, Object.assign({}, conflict.imported, {id, groupId:conflict.groupId}));
+      }
+    }
+    pendingImport = null;
+    document.getElementById('settingsMergeBackdrop').classList.remove('show');
+    showToast('All data imported without removing existing data');
   }catch(error){ console.error(error); showToast('Import failed'); }
 }
 function closeLogout(){ document.getElementById('logoutBackdrop').classList.remove('show'); }
@@ -40,17 +107,24 @@ function closeLogout(){ document.getElementById('logoutBackdrop').classList.remo
 document.getElementById('exportBtn').onclick = exportData;
 document.getElementById('importBtn').onclick = () => document.getElementById('importFile').click();
 document.getElementById('importFile').onchange = event => { const file = event.target.files[0]; if(file) importData(file); event.target.value = ''; };
+document.getElementById('cancelSettingsMergeBtn').onclick = () => { pendingImport = null; document.getElementById('settingsMergeBackdrop').classList.remove('show'); };
+document.getElementById('confirmSettingsMergeBtn').onclick = () => {
+  if(!pendingImport) return;
+  const choices = pendingImport.conflicts.map((_, index) => document.querySelector('input[name="settings_merge_' + index + '"]:checked')?.value || 'keep_existing');
+  applySettingsImport(choices);
+};
 document.getElementById('logoutBtn').onclick = () => document.getElementById('logoutBackdrop').classList.add('show');
 document.getElementById('cancelLogoutBtn').onclick = closeLogout;
 document.getElementById('logoutBackdrop').onclick = event => { if(event.target.id === 'logoutBackdrop') closeLogout(); };
 document.getElementById('confirmLogoutBtn').onclick = async () => { try{ await signOutUser(); }catch(error){ console.error(error); showToast('Log out failed'); } };
 
 onAuthStateChanged(async user => {
-  if(!user){ window.location.replace('home.html'); return; }
+  if(!user){ showUnauthorized(); window.location.replace('home.html'); return; }
   currentUser = user;
+  showAuthenticatedShell(user);
   document.getElementById('settingsEmail').textContent = user.email || 'Account';
-  listenerUid = user.uid;
-  listenToUser(user.uid, snapshot => updateSummary(snapshot));
-  document.documentElement.classList.remove('auth-pending');
+  getAccountData(user.uid).then(snapshot => updateSummary(snapshot)).catch(error => {
+    console.error(error);
+    showToast('Could not load account data');
+  });
 });
-window.addEventListener('beforeunload', () => { if(listenerUid) stopListeningToUser(listenerUid); });

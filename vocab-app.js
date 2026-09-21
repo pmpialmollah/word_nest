@@ -1,16 +1,20 @@
 import {
-  initFirebase,
-  onAuthStateChanged,
-  signUpWithEmail,
-  signInWithEmail,
-  signOutUser,
-  getUserOnce,
-  listenToUser,
-  stopListeningToUser,
-  setUserChild,
-  updateUserChild,
-  removeUserChild
-} from './firebase-config.js';
+  addGroup,
+  addWord,
+  deleteGroup,
+  deleteWord,
+  importVocabulary,
+  renameGroup,
+  setActiveGroup,
+  subscribeToVocabulary,
+  updateWord,
+} from './src/repositories/vocabularyRepository.js';
+import { initFirebase } from './src/firebase/config.js';
+import { onAuthStateChanged, signUpWithEmail, signInWithEmail, signOutUser } from './src/firebase/auth.js';
+import { finishDataLoading, showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
+import { setAppState } from './src/app/state.js';
+import { createEmptyModel, createId, escapeHtml } from './src/features/vocabulary/model.js';
+import { createImportPlan } from './src/features/import-export/mergePlan.js';
 
 const STORAGE_KEY = 'wordnest_data_v1';
 
@@ -18,91 +22,44 @@ const STORAGE_KEY = 'wordnest_data_v1';
 initFirebase();
 let currentUser = null;
 let currentListenerUid = null;
-
-function firebaseObjectToAppModel(obj, prev){
-  const base = { groups:[{id:'default',name:'general'}], words:[], notes:[], activeGroup:'default' };
-
-  if(!obj) return base;
-
-  const groupMap = {};
-  if(obj.groups){
-    Object.keys(obj.groups).forEach(k => {
-      const g = obj.groups[k];
-      if(g) groupMap[g.id || k] = { id: g.id || k, name: g.name || '' };
-    });
-  }
-  const groups = Object.keys(groupMap).map(k => groupMap[k]);
-  if(groups.length === 0) groups.push({id:'default', name:'general'});
-
-  const words = [];
-  if(obj.words){
-    Object.keys(obj.words).forEach(k => {
-      const w = obj.words[k];
-      if(w) words.push(w.id ? w : Object.assign({}, w, { id: k }));
-    });
-  }
-
-  let active = (groups[0] && groups[0].id) || 'default';
-  if(obj.activeGroup && groups.find(g => g.id === obj.activeGroup)) active = obj.activeGroup;
-
-  const notes = [];
-  const cloudNotes = obj.notes || {};
-  Object.keys(cloudNotes).forEach(k => {
-    const note = cloudNotes[k];
-    if(note) notes.push(Object.assign({}, note, { id: note.id || k }));
-  });
-  return { groups, activeGroup: active, words, notes };
-}
-
-function normalizeAppModelToFirebaseModel(app){
-  const out = {};
-  out.groups = {};
-  (app.groups||[]).forEach(g => { out.groups[g.id] = { id: g.id, name: g.name }; });
-  out.words = {};
-  (app.words||[]).forEach(w => { out.words[w.id] = w; });
-  out.notes = {};
-  (app.notes||[]).forEach(note => { out.notes[note.id] = note; });
-  out.activeGroup = app.activeGroup || (app.groups && app.groups[0] && app.groups[0].id) || 'default';
-  return out;
-}
+let stopVocabularySubscription = null;
 
 async function startUserSync(uid){
   // avoid duplicate listeners
   if(currentListenerUid === uid) return;
-  if(currentListenerUid) stopListeningToUser(currentListenerUid);
+  if(stopVocabularySubscription) stopVocabularySubscription();
   currentListenerUid = uid;
 
   // start realtime listener
-  listenToUser(uid, fbObj => {
-    const normalized = firebaseObjectToAppModel(fbObj, data);
-    data = normalized;
+  stopVocabularySubscription = subscribeToVocabulary(uid, normalized => {
+    const previous = data;
+    replaceData(normalized);
     saveData();
-    render();
+    if(groupsNeedRefresh(previous, normalized)) renderGroups();
+    renderWords();
+    finishDataLoading();
   });
 }
 
-function stopUserSync(){ if(currentListenerUid){ stopListeningToUser(currentListenerUid); currentListenerUid = null; } }
-
-
-function loadData(){
-  return {
-    groups: [{id:'default', name:'general'}],
-    activeGroup: 'default',
-    words: [
-      // {id: cryptoId(), text:'ephemeral', meaning:'ক্ষণস্থায়ী', example:'Fame in this industry is often ephemeral.', groupId:'default', revealed:false}
-    ],
-    notes: []
-  };
+function stopUserSync(){
+  if(stopVocabularySubscription) stopVocabularySubscription();
+  stopVocabularySubscription = null;
+  currentListenerUid = null;
 }
 
-function cryptoId(){
-  return 'w_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,8);
-}
 
-let data = loadData();
+let data = createEmptyModel();
+setAppState({ data, vocabulary: data.words, groups: data.groups });
+
+function replaceData(nextData){
+  data = nextData;
+  setAppState({ data, vocabulary: data.words, groups: data.groups });
+}
 let searchQuery = '';
+let searchTimer = null;
 let groupModalMode = 'create'; // 'create' | 'rename'
 let editingWordId = null;
+let pendingEditSave = null;
 let groupPendingDelete = null;
 let wordPendingDelete = null;
 let openMenuGroupId = null;
@@ -129,6 +86,17 @@ function render(){
   renderGroups();
   renderWords();
   saveData();
+}
+
+function groupsNeedRefresh(previous, next){
+  if(previous.activeGroup !== next.activeGroup || previous.groups.length !== next.groups.length) return true;
+  return next.groups.some((group, index) => {
+    const oldGroup = previous.groups[index];
+    if(!oldGroup || oldGroup.id !== group.id || oldGroup.name !== group.name) return true;
+    const oldCount = previous.words.filter(word => word.groupId === group.id).length;
+    const newCount = next.words.filter(word => word.groupId === group.id).length;
+    return oldCount !== newCount;
+  });
 }
 
 function renderGroups(){
@@ -233,9 +201,8 @@ function renderWords(){
     markBtn.onclick = (e) => {
       e.stopPropagation();
       if(!requireAuth()) return;
-      if(!window.confirm(w.read ? 'Mark this word as unread?' : 'Mark this word as read?')) return;
       if(currentUser){
-        updateUserChild(currentUser.uid, `words/${w.id}`, { read: !w.read }).then(()=>{}).catch(err=>{ console.error(err); showToast('Update failed'); });
+        updateWord(currentUser.uid, w.id, { read: !w.read }).then(()=>{}).catch(err=>{ console.error(err); showToast('Update failed'); });
       } else {
         w.read = !w.read;
         showToast(w.read ? 'Marked as read' : 'Marked as unread');
@@ -274,9 +241,8 @@ function renderWords(){
     }
     meaningBtn.onclick = () => {
       if(!requireAuth()) return;
-      if(!window.confirm(w.revealed ? 'Hide this meaning?' : 'Reveal this meaning?')) return;
       if(currentUser){
-        updateUserChild(currentUser.uid, `words/${w.id}`, { revealed: !w.revealed }).then(()=>{}).catch(err=>{ console.error(err); showToast('Update failed'); });
+        updateWord(currentUser.uid, w.id, { revealed: !w.revealed }).then(()=>{}).catch(err=>{ console.error(err); showToast('Update failed'); });
       } else {
         w.revealed = !w.revealed;
         saveData(); render();
@@ -319,7 +285,7 @@ document.getElementById('addWordBtn').onclick = () => {
   }
   wordInput.style.borderColor = '';
   const newWord = {
-    id: cryptoId(),
+    id: createId(),
     text: text,
     meaning: meaningInput.value.trim(),
     example: exampleInput.value.trim(),
@@ -329,7 +295,7 @@ document.getElementById('addWordBtn').onclick = () => {
   };
   if(currentUser){
     // write single word to cloud; listener will update UI
-    setUserChild(currentUser.uid, `words/${newWord.id}`, newWord).then(() => {
+    addWord(currentUser.uid, newWord).then(() => {
       showToast('Saved');
     }).catch(err => { showToast('Save failed'); console.error(err); });
   } else {
@@ -404,9 +370,14 @@ document.getElementById('confirmLogoutBtn').onclick = async () => {
 onAuthStateChanged(async user => {
   if(user){
     currentUser = user;
-    await startUserSync(user.uid);
-    document.documentElement.classList.remove('auth-pending');
+    showAuthenticatedShell(user);
+    startUserSync(user.uid).catch(error => {
+      console.error(error);
+      finishDataLoading();
+      showToast('Could not load your vocabulary');
+    });
   } else {
+    showUnauthorized();
     window.location.replace('home.html');
     return;
     currentUser = null;
@@ -420,7 +391,7 @@ onAuthStateChanged(async user => {
     // reset cloud-only mode flag when signed out
     window.cloudOnlyMode = false;
     // seed with default empty model (do not reload stale local data)
-    data = { groups: [{id:'default', name:'general'}], activeGroup: 'default', words: [], notes: [] };
+    replaceData(createEmptyModel());
     render();
   }
 });
@@ -448,7 +419,8 @@ document.getElementById('confirmAuthBtn').onclick = async () => {
 /* ---- Search ---- */
 document.getElementById('searchInput').addEventListener('input', e => {
   searchQuery = e.target.value.trim();
-  renderWords();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => renderWords(), 120);
 });
 
 /* ---- Group create/rename modal ---- */
@@ -491,18 +463,17 @@ document.getElementById('saveGroupBtn').onclick = () => {
   input.style.borderColor = '';
   if(groupModalMode === 'rename' && input.dataset.editingId){
     const id = input.dataset.editingId;
-    if(!window.confirm('Change this group name?')) return;
     if(currentUser){
-      updateUserChild(currentUser.uid, `groups/${id}`, { name }).catch(err => { console.error(err); showToast('Update failed'); });
+      renameGroup(currentUser.uid, id, name).catch(err => { console.error(err); showToast('Update failed'); });
     } else {
       const g = data.groups.find(g => g.id === id);
       if(g) g.name = name;
     }
   } else {
-    const id = cryptoId();
+    const id = createId('g');
     if(currentUser){
-      setUserChild(currentUser.uid, `groups/${id}`, { id, name }).then(()=>{
-        setUserChild(currentUser.uid, 'activeGroup', id);
+      addGroup(currentUser.uid, { id, name }).then(()=>{
+        setActiveGroup(currentUser.uid, id);
       }).catch(err => { console.error(err); showToast('Create failed'); });
     } else {
       data.groups.push({id, name});
@@ -581,28 +552,7 @@ document.getElementById('confirmDeleteGroupBtn').onclick = () => {
   if(currentUser){
     (async () => {
       try{
-        // remove words in that group
-        const userData = await getUserOnce(currentUser.uid);
-        const words = userData && userData.words ? userData.words : {};
-        Object.keys(words).forEach(async wid => {
-          const w = words[wid];
-          if(w && w.groupId === gid){
-            await removeUserChild(currentUser.uid, `words/${wid}`);
-          }
-        });
-        // remove group
-        await removeUserChild(currentUser.uid, `groups/${gid}`);
-        // ensure at least one group exists
-        const after = await getUserOnce(currentUser.uid);
-        const groupsLeft = after && after.groups ? Object.keys(after.groups).length : 0;
-        if(groupsLeft === 0){
-          const id = cryptoId();
-          await setUserChild(currentUser.uid, `groups/${id}`, { id, name: 'General' });
-          await setUserChild(currentUser.uid, 'activeGroup', id);
-        } else {
-          const active = after && after.activeGroup ? after.activeGroup : (after && after.groups ? Object.keys(after.groups)[0] : null);
-          if(active) await setUserChild(currentUser.uid, 'activeGroup', active);
-        }
+        await deleteGroup(currentUser.uid, gid);
         document.getElementById('deleteGroupBackdrop').classList.remove('show');
         groupPendingDelete = null;
         showToast('Group is deleted');
@@ -612,7 +562,7 @@ document.getElementById('confirmDeleteGroupBtn').onclick = () => {
     data.words = data.words.filter(w => w.groupId !== gid);
     data.groups = data.groups.filter(g => g.id !== gid);
     if(data.groups.length === 0){
-      const id = cryptoId();
+      const id = createId('g');
       data.groups.push({id, name:'General'});
       data.activeGroup = id;
     } else if(data.activeGroup === gid){
@@ -656,21 +606,32 @@ document.getElementById('saveEditBtn').onclick = () => {
   textInput.style.borderColor = '';
   const w = data.words.find(w => w.id === editingWordId);
   const newVals = { text, meaning: document.getElementById('editMeaningInput').value.trim(), example: document.getElementById('editExampleInput').value.trim() };
-  if(!window.confirm('Save these changes to the word?')) return;
+  if(!w) return;
+  pendingEditSave = {word:w, values:newVals};
+  document.getElementById('editConfirmBackdrop').classList.add('show');
+};
+function closeEditConfirmation(){
+  pendingEditSave = null;
+  document.getElementById('editConfirmBackdrop').classList.remove('show');
+}
+document.getElementById('cancelEditConfirmBtn').onclick = closeEditConfirmation;
+document.getElementById('editConfirmBackdrop').addEventListener('click', event => {
+  if(event.target.id === 'editConfirmBackdrop') closeEditConfirmation();
+});
+document.getElementById('confirmEditBtn').onclick = () => {
+  if(!pendingEditSave) return;
+  const {word, values} = pendingEditSave;
   if(currentUser){
-    if(w){
-      const merged = Object.assign({}, w, newVals);
-      setUserChild(currentUser.uid, `words/${w.id}`, merged).catch(err => { console.error(err); showToast('Save failed'); });
-    }
+    const merged = Object.assign({}, word, values);
+    updateWord(currentUser.uid, word.id, merged).catch(err => { console.error(err); showToast('Save failed'); });
   } else {
-    if(w){
-      w.text = newVals.text;
-      w.meaning = newVals.meaning;
-      w.example = newVals.example;
-    }
+    word.text = values.text;
+    word.meaning = values.meaning;
+    word.example = values.example;
     closeEditModal();
     render();
   }
+  closeEditConfirmation();
   closeEditModal();
 };
 
@@ -712,7 +673,7 @@ if(exportBtn) exportBtn.onclick = () => {
 };
 
 /* ---- Import: merge, never blind-replace ---- */
-let pendingImport = null; // { groupsToAdd, wordsToAddDirect, conflicts:[{importedWord, existingWord, targetGroupId}] }
+let pendingImport = null;
 
 const importBtn = document.getElementById('importBtn');
 if(importBtn) importBtn.onclick = () => {
@@ -749,48 +710,9 @@ if(importFile) importFile.addEventListener('change', e => {
 });
 
 function startMerge(imported){
-  // Map imported group id -> matching existing group (by name, case-insensitive), or mark as new
-  const groupIdMap = {}; // importedGroupId -> existingOrNewGroupId
-  const groupsToAdd = [];
+  pendingImport = createImportPlan(imported, data);
 
-  imported.groups.forEach(ig => {
-    const existing = data.groups.find(g => g.name.trim().toLowerCase() === ig.name.trim().toLowerCase());
-    if(existing){
-      groupIdMap[ig.id] = existing.id;
-    } else {
-      const newId = cryptoId();
-      groupIdMap[ig.id] = newId;
-      groupsToAdd.push({id:newId, name:ig.name});
-    }
-  });
-
-  const wordsToAddDirect = [];
-  const conflicts = [];
-
-  imported.words.forEach(iw => {
-    const targetGroupId = groupIdMap[iw.groupId] || null;
-    if(!targetGroupId) return; // orphaned word, skip
-    const dupe = data.words.find(w =>
-      w.groupId === targetGroupId && w.text.trim().toLowerCase() === iw.text.trim().toLowerCase()
-    );
-    if(dupe){
-      conflicts.push({imported: iw, existing: dupe, targetGroupId});
-    } else {
-      wordsToAddDirect.push({
-        id: cryptoId(),
-        text: iw.text,
-        meaning: iw.meaning || '',
-        example: iw.example || '',
-        groupId: targetGroupId,
-        revealed: false
-      });
-    }
-  });
-
-  const notesToAdd = (imported.notes || []).map(note => Object.assign({}, note, {id: cryptoId()}));
-  pendingImport = {groupsToAdd, wordsToAddDirect, conflicts, notesToAdd};
-
-  if(conflicts.length === 0){
+  if(pendingImport.conflicts.length === 0){
     applyImport('keep_new'); // no conflicts, nothing to choose
   } else {
     renderMergeModal();
@@ -804,8 +726,8 @@ function renderMergeModal(){
   pendingImport.conflicts.forEach((c, idx) => {
     const item = document.createElement('div');
     item.className = 'merge-item';
-    const groupName = (data.groups.find(g => g.id === c.targetGroupId) ||
-      pendingImport.groupsToAdd.find(g => g.id === c.targetGroupId) || {}).name || '';
+    const groupName = (data.groups.find(g => g.id === c.groupId) ||
+      pendingImport.groupsToAdd.find(g => g.id === c.groupId) || {}).name || '';
     item.innerHTML =
       '<p class="mi-word">' + escapeHtml(c.imported.text) + ' <span style="font-size:12px; color:var(--ink-soft); font-family:\'Inter\',sans-serif;">(' + escapeHtml(groupName) + ')</span></p>' +
       '<div class="merge-options">' +
@@ -815,12 +737,6 @@ function renderMergeModal(){
       '</div>';
     list.appendChild(item);
   });
-}
-
-function escapeHtml(str){
-  const d = document.createElement('div');
-  d.textContent = str == null ? '' : str;
-  return d.innerHTML;
 }
 
 document.getElementById('cancelMergeBtn').onclick = () => {
@@ -846,28 +762,10 @@ document.getElementById('confirmMergeBtn').onclick = () => {
 
 async function applyImport(conflictChoices){
   if(!pendingImport) return;
-  const {groupsToAdd, wordsToAddDirect, conflicts, notesToAdd} = pendingImport;
+  const {groupsToAdd, wordsToAdd, conflicts} = pendingImport;
   if(currentUser){
-    // write groups
     try{
-      for(const g of groupsToAdd){ await setUserChild(currentUser.uid, `groups/${g.id}`, g); }
-      for(const w of wordsToAddDirect){ await setUserChild(currentUser.uid, `words/${w.id}`, w); }
-      for(const note of notesToAdd){ await setUserChild(currentUser.uid, `notes/${note.id}`, note); }
-      // handle conflicts according to choices
-      for(const [idx, c] of conflicts.entries()){
-        const choice = Array.isArray(conflictChoices) ? conflictChoices[idx] : conflictChoices;
-        if(choice === 'keep_new'){
-          // overwrite existing word with imported content but keep existing id
-          const existingId = c.existing.id;
-          const newVal = Object.assign({}, c.imported, { id: existingId, groupId: c.targetGroupId });
-          await setUserChild(currentUser.uid, `words/${existingId}`, newVal);
-        } else if(choice === 'keep_both'){
-          const newId = cryptoId();
-          const newWord = { id: newId, text: c.imported.text, meaning: c.imported.meaning || '', example: c.imported.example || '', groupId: c.targetGroupId, revealed: false };
-          await setUserChild(currentUser.uid, `words/${newId}`, newWord);
-        }
-        // keep_existing -> do nothing
-      }
+        await importVocabulary(currentUser.uid, pendingImport, conflictChoices);
     }catch(err){ console.error(err); showToast('Import failed'); pendingImport = null; return; }
     pendingImport = null;
     showToast('Import successful — uploaded to cloud');
@@ -877,7 +775,7 @@ async function applyImport(conflictChoices){
 
   // offline/local import behavior
   data.groups.push(...groupsToAdd);
-  data.words.push(...wordsToAddDirect);
+  data.words.push(...wordsToAdd);
 
   conflicts.forEach((c, idx) => {
     const choice = Array.isArray(conflictChoices) ? conflictChoices[idx] : conflictChoices;
@@ -887,18 +785,18 @@ async function applyImport(conflictChoices){
       c.existing.example = c.imported.example || '';
     } else if(choice === 'keep_both'){
       data.words.push({
-        id: cryptoId(),
+        id: createId(),
         text: c.imported.text,
         meaning: c.imported.meaning || '',
         example: c.imported.example || '',
-        groupId: c.targetGroupId,
+        groupId: c.groupId,
         revealed: false
       });
     }
     // keep_existing -> do nothing
   });
 
-  const addedCount = wordsToAddDirect.length;
+  const addedCount = wordsToAdd.length;
   const conflictCount = conflicts.length;
   pendingImport = null;
   render();
@@ -943,7 +841,7 @@ document.getElementById('confirmDeleteWordBtn').onclick = () => {
   if(!wordPendingDelete) return;
   const wid = wordPendingDelete;
   if(currentUser){
-    removeUserChild(currentUser.uid, `words/${wid}`).then(()=>{
+    deleteWord(currentUser.uid, wid).then(()=>{
       const bd = document.getElementById('deleteWordBackdrop');
       if(bd) bd.classList.remove('show');
       wordPendingDelete = null;
@@ -986,7 +884,7 @@ document.getElementById('confirmMarkAllBtn').onclick = () => {
   const want = (choice === 'read');
   if(currentUser){
     data.words.filter(w => w.groupId === data.activeGroup).forEach(w => {
-      updateUserChild(currentUser.uid, `words/${w.id}`, { read: want }).catch(err => console.error(err));
+      updateWord(currentUser.uid, w.id, { read: want }).catch(err => console.error(err));
     });
     document.getElementById('markAllBackdrop').classList.remove('show');
     showToast(want ? 'All marked as read' : 'All marked as unread');
