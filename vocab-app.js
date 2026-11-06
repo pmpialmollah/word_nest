@@ -5,6 +5,7 @@ import {
   deleteWord,
   importVocabulary,
   renameGroup,
+  reorderWords,
   setActiveGroup,
   subscribeToVocabulary,
   updateWord,
@@ -13,7 +14,7 @@ import { initFirebase } from './src/firebase/config.js';
 import { onAuthStateChanged, signUpWithEmail, signInWithEmail, signOutUser } from './src/firebase/auth.js';
 import { finishDataLoading, showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
 import { setAppState } from './src/app/state.js';
-import { createEmptyModel, createId, escapeHtml } from './src/features/vocabulary/model.js';
+import { createEmptyModel, createId, escapeHtml, sortByPosition } from './src/features/vocabulary/model.js';
 import { createImportPlan } from './src/features/import-export/mergePlan.js';
 
 const STORAGE_KEY = 'wordnest_data_v1';
@@ -57,6 +58,7 @@ function replaceData(nextData){
 }
 let searchQuery = '';
 let searchTimer = null;
+let rearrangeWords = false;
 let groupModalMode = 'create'; // 'create' | 'rename'
 let editingWordId = null;
 let pendingEditSave = null;
@@ -161,7 +163,7 @@ function renderWords(){
     try{ saveData(); }catch(e){}
   }
 
-  let words = data.words.filter(w => w.groupId === data.activeGroup);
+  let words = sortByPosition(data.words.filter(w => w.groupId === data.activeGroup));
 
   if(searchQuery){
     const q = searchQuery.toLowerCase();
@@ -190,6 +192,9 @@ function renderWords(){
   words.forEach(w => {
     const card = document.createElement('div');
     card.className = 'word-card' + (w.read ? ' read' : '');
+    card.dataset.wordId = w.id;
+    card.draggable = rearrangeWords && !searchQuery;
+    if(rearrangeWords && !searchQuery) card.title = 'Drag to rearrange';
 
     // right-side actions (mark / edit / delete)
     const actions = document.createElement('div');
@@ -293,6 +298,10 @@ document.getElementById('addWordBtn').onclick = () => {
     revealed: false,
     read: false
   };
+  const activeWords = data.words.filter(word => word.groupId === data.activeGroup);
+  if(activeWords.length && activeWords.every(word => Number.isFinite(word.position))){
+    newWord.position = Math.min(...activeWords.map(word => word.position)) - 1;
+  }
   if(currentUser){
     // write single word to cloud; listener will update UI
     addWord(currentUser.uid, newWord).then(() => {
@@ -421,6 +430,53 @@ document.getElementById('searchInput').addEventListener('input', e => {
   searchQuery = e.target.value.trim();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => renderWords(), 120);
+});
+
+const wordGrid = document.getElementById('wordGrid');
+let draggedWordId = null;
+const rearrangeWordsBtn = document.getElementById('rearrangeWordsBtn');
+rearrangeWordsBtn.addEventListener('click', () => {
+  rearrangeWords = !rearrangeWords;
+  rearrangeWordsBtn.textContent = rearrangeWords ? 'Rearrange: on' : 'Rearrange: off';
+  rearrangeWordsBtn.setAttribute('aria-pressed', String(rearrangeWords));
+  renderWords();
+  if(rearrangeWords && searchQuery) showToast('Clear search to rearrange words');
+});
+wordGrid.addEventListener('dragstart', event => {
+  const card = event.target.closest('.word-card[draggable="true"]');
+  if(!card || !rearrangeWords || searchQuery || !currentUser) return;
+  draggedWordId = card.dataset.wordId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', draggedWordId);
+  card.classList.add('dragging');
+});
+wordGrid.addEventListener('dragover', event => {
+  const card = event.target.closest('.word-card[draggable="true"]');
+  if(!card || !draggedWordId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+});
+wordGrid.addEventListener('drop', async event => {
+  const card = event.target.closest('.word-card[draggable="true"]');
+  if(!card || !rearrangeWords || !draggedWordId || !currentUser) return;
+  event.preventDefault();
+  const words = sortByPosition(data.words.filter(word => word.groupId === data.activeGroup));
+  const draggedIndex = words.findIndex(word => word.id === draggedWordId);
+  const targetIndex = words.findIndex(word => word.id === card.dataset.wordId);
+  if(draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) return;
+  [words[draggedIndex], words[targetIndex]] = [words[targetIndex], words[draggedIndex]];
+  try{
+    await reorderWords(currentUser.uid, words.map(word => word.id));
+    words.forEach((word, position) => { word.position = position; });
+    renderWords();
+  }catch(error){
+    console.error(error);
+    showToast('Could not save word order');
+  }
+});
+wordGrid.addEventListener('dragend', () => {
+  draggedWordId = null;
+  wordGrid.querySelectorAll('.dragging').forEach(card => card.classList.remove('dragging'));
 });
 
 /* ---- Group create/rename modal ---- */

@@ -3,6 +3,7 @@ import {
   addNote as addNoteToRepository,
   getAccountData,
   importNotes,
+  reorderNotes,
   updateNote,
   deleteNote as deleteNoteFromRepository
 } from './src/repositories/vocabularyRepository.js';
@@ -10,6 +11,7 @@ import { initFirebase } from './src/firebase/config.js';
 import { onAuthStateChanged, signUpWithEmail, signInWithEmail, signOutUser } from './src/firebase/auth.js';
 import { finishDataLoading, showAuthenticatedShell, showUnauthorized } from './src/app/app.js';
 import { createNoteImportPlan } from './src/features/notes/mergePlan.js';
+import { sortByPosition } from './src/features/vocabulary/model.js';
 
 const STORAGE_KEY = 'wordnest_data_v1';
 const NOTE_COLORS = ['yellow', 'pink', 'blue', 'green'];
@@ -17,6 +19,7 @@ let currentUser = null;
 let currentListenerUid = null;
 let stopNotesSubscription = null;
 let activeFilter = 'all';
+let rearrangeNotes = false;
 let selectedColor = 'yellow';
 let editColor = 'yellow';
 let editingNoteId = null;
@@ -107,7 +110,7 @@ function closeConfirmation(){
   pendingConfirmation = null;
 }
 function visibleNotes(){
-  const notes = data.notes || [];
+  const notes = sortByPosition(data.notes || []);
   if(activeFilter === 'read') return notes.filter(note => note.read);
   if(activeFilter === 'unread') return notes.filter(note => !note.read);
   return notes;
@@ -124,6 +127,9 @@ function renderNotes(){
   notes.forEach((note, index) => {
     const card = document.createElement('article');
     card.className = 'sticky-note ' + (NOTE_COLORS.includes(note.color) ? note.color : 'yellow') + (note.read ? ' read' : '');
+    card.dataset.noteId = note.id;
+    card.draggable = rearrangeNotes && activeFilter === 'all';
+    card.title = rearrangeNotes && activeFilter === 'all' ? 'Drag to rearrange' : '';
     card.style.setProperty('--note-tilt', index % 3 === 1 ? '-1.1deg' : index % 3 === 2 ? '0.8deg' : '0deg');
     const pin = document.createElement('span'); pin.className = 'note-pin'; pin.setAttribute('aria-hidden', 'true');
     const title = document.createElement('h2'); title.textContent = note.title || 'Untitled note';
@@ -155,6 +161,10 @@ function addNote(){
   const text = editorText(editor);
   if(!text){ document.getElementById('noteTextInput').focus(); return; }
   const note = {id:noteId(), title, text, richText:editorHtml(editor), color:selectedColor, read:false, createdAt:Date.now(), updatedAt:Date.now()};
+  const notes = data.notes || [];
+  if(notes.length && notes.every(item => Number.isFinite(item.position))){
+    note.position = Math.min(...notes.map(item => item.position)) - 1;
+  }
   writeNote(note, 'Note added');
   document.getElementById('noteTitleInput').value = '';
   editor.innerHTML = '';
@@ -206,6 +216,52 @@ function deleteNote(){
 
 document.getElementById('addNoteBtn').onclick = addNote;
 document.getElementById('noteTextInput').addEventListener('keydown', event => { if(event.key === 'Enter' && (event.ctrlKey || event.metaKey)) addNote(); });
+const notesGrid = document.getElementById('notesGrid');
+let draggedNoteId = null;
+const rearrangeNotesBtn = document.getElementById('rearrangeNotesBtn');
+rearrangeNotesBtn.addEventListener('click', () => {
+  rearrangeNotes = !rearrangeNotes;
+  rearrangeNotesBtn.textContent = rearrangeNotes ? 'Rearrange: on' : 'Rearrange: off';
+  rearrangeNotesBtn.setAttribute('aria-pressed', String(rearrangeNotes));
+  renderNotes();
+  if(rearrangeNotes && activeFilter !== 'all') showToast('Switch to All notes to rearrange');
+});
+notesGrid.addEventListener('dragstart', event => {
+  const card = event.target.closest('.sticky-note[draggable="true"]');
+  if(!card || !rearrangeNotes || activeFilter !== 'all' || !currentUser) return;
+  draggedNoteId = card.dataset.noteId;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', draggedNoteId);
+  card.classList.add('dragging');
+});
+notesGrid.addEventListener('dragover', event => {
+  const card = event.target.closest('.sticky-note[draggable="true"]');
+  if(!card || !draggedNoteId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+});
+notesGrid.addEventListener('drop', async event => {
+  const card = event.target.closest('.sticky-note[draggable="true"]');
+  if(!card || !rearrangeNotes || !draggedNoteId || activeFilter !== 'all' || !currentUser) return;
+  event.preventDefault();
+  const notes = sortByPosition(data.notes || []);
+  const draggedIndex = notes.findIndex(note => note.id === draggedNoteId);
+  const targetIndex = notes.findIndex(note => note.id === card.dataset.noteId);
+  if(draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) return;
+  [notes[draggedIndex], notes[targetIndex]] = [notes[targetIndex], notes[draggedIndex]];
+  try{
+    await reorderNotes(currentUser.uid, notes.map(note => note.id));
+    notes.forEach((note, position) => { note.position = position; });
+    renderNotes();
+  }catch(error){
+    console.error(error);
+    showToast('Could not save note order');
+  }
+});
+notesGrid.addEventListener('dragend', () => {
+  draggedNoteId = null;
+  notesGrid.querySelectorAll('.dragging').forEach(card => card.classList.remove('dragging'));
+});
 function editorForNode(node){
   const element = node && (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement);
   return element && element.closest('.rich-editor');
@@ -284,7 +340,7 @@ document.querySelectorAll('[data-editor-action]').forEach(button => {
 document.querySelectorAll('.rich-editor').forEach(editor => editor.addEventListener('contextmenu', event => event.preventDefault()));
 document.querySelectorAll('[data-color]').forEach(button => button.onclick = () => selectColor(button.dataset.color));
 document.querySelectorAll('[data-edit-color]').forEach(button => button.onclick = () => selectColor(button.dataset.editColor, true));
-document.querySelectorAll('.filter-btn').forEach(button => button.onclick = () => { activeFilter = button.dataset.filter; document.querySelectorAll('.filter-btn').forEach(item => item.classList.toggle('active', item === button)); renderNotes(); });
+document.querySelectorAll('.filter-btn[data-filter]').forEach(button => button.onclick = () => { activeFilter = button.dataset.filter; document.querySelectorAll('.filter-btn[data-filter]').forEach(item => item.classList.toggle('active', item === button)); renderNotes(); });
 document.getElementById('cancelEditNoteBtn').onclick = closeEditNote;
 document.getElementById('saveEditNoteBtn').onclick = saveEditNote;
 document.getElementById('cancelDeleteNoteBtn').onclick = closeDeleteNote;

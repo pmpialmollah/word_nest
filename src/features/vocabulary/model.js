@@ -34,6 +34,20 @@ export function normalizeVocabularySnapshot(snapshot) {
   return { groups, activeGroup, words, notes };
 }
 
+export function sortByPosition(items) {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => {
+      const aHasPosition = Number.isFinite(a.item.position);
+      const bHasPosition = Number.isFinite(b.item.position);
+      if (aHasPosition && bHasPosition) return a.item.position - b.item.position || a.index - b.index;
+      if (aHasPosition) return -1;
+      if (bHasPosition) return 1;
+      return a.index - b.index;
+    })
+    .map(({ item }) => item);
+}
+
 export function createId(prefix = 'w') {
   return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 }

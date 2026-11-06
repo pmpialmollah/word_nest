@@ -41,6 +41,14 @@ export function updateWord(uid, wordId, changes) {
   return updateUserChild(uid, `words/${wordId}`, changes);
 }
 
+export function reorderWords(uid, wordIds) {
+  const changes = {};
+  wordIds.forEach((wordId, position) => {
+    changes[`words/${wordId}/position`] = position;
+  });
+  return updateUserChild(uid, '', changes);
+}
+
 export function deleteWord(uid, wordId) {
   return removeUserChild(uid, `words/${wordId}`);
 }
@@ -51,6 +59,14 @@ export function addNote(uid, note) {
 
 export function updateNote(uid, noteId, changes) {
   return updateUserChild(uid, `notes/${noteId}`, changes);
+}
+
+export function reorderNotes(uid, noteIds) {
+  const changes = {};
+  noteIds.forEach((noteId, position) => {
+    changes[`notes/${noteId}/position`] = position;
+  });
+  return updateUserChild(uid, '', changes);
 }
 
 export function deleteNote(uid, noteId) {

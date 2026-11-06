@@ -203,6 +203,8 @@
     white-space:nowrap;
   }
   .io-btn:hover{ border-color:var(--moss); color:var(--ink); }
+  .io-btn[aria-pressed="true"],.rearrange-toggle[aria-pressed="true"]{ border-color:var(--moss); background:var(--moss); color:#fff; }
+  .io-btn[aria-pressed="true"]:hover,.rearrange-toggle[aria-pressed="true"]:hover{ background:var(--moss-dark); color:#fff; }
 
   /* Add word bar */
   .add-bar{
@@ -267,6 +269,8 @@
     padding:16px 18px;
     position:relative;
   }
+  .word-card[draggable="true"],.sticky-note[draggable="true"]{ cursor:grab; }
+  .word-card.dragging,.sticky-note.dragging{ opacity:.55; cursor:grabbing; }
   .word-card .word{
     font-family:'Lora', serif;
     font-weight:600;
